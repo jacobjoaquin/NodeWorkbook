@@ -7,27 +7,32 @@
 #define N_PIXELS 320
 #define WIDTH 40
 #define HEIGHT 8
+#define MAX_STRING_LENGTH 200
 
-
-char message[] = "NYAN CAT FOREVER!!!";
+char message[MAX_STRING_LENGTH] = "_";
 int messageLength = sizeof(message) / sizeof(char);
 int letterOffset = 0;
 int columnOffset = 8;
 uint32_t scrollBuffer[HEIGHT][WIDTH];
 Adafruit_NeoPixel strip;
 
-uint32_t remap(int x, int y) {
-  int i = x % 2;
-  return (x + i) * HEIGHT - i + (i ? -y : y);
-}
+String inputString = "";         // a string to hold incoming data
+boolean stringComplete = false;  // whether the string is complete
+
 
 void setup() {
   strip = Adafruit_NeoPixel(N_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
   strip.begin();
   initScrollBuffer();
+
+  Serial.begin(9600);
+  inputString.reserve(MAX_STRING_LENGTH);
 }
 
 void loop() {
+  serialEvent(); //call the function
+  inputStringToSerial();
+ 
   for (int y = 0; y < HEIGHT; y++) {
     scrollBuffer[y][WIDTH - 1] = 0;
   }
@@ -36,7 +41,38 @@ void loop() {
   scrollMe();
   scrollBufferToStrip();
   strip.show();
-  delay(80);
+  delay(100);
+}
+
+void inputStringToSerial() {
+  if (stringComplete) {
+    int stringLength = min(MAX_STRING_LENGTH - 1, inputString.length());
+    for (int i = 0; i < stringLength; i++) {
+      message[i] = inputString.charAt(i);
+    }
+    message[stringLength] = '\0';
+    messageLength = stringLength;
+    letterOffset = 0;
+    columnOffset = 8;
+    inputString = "";
+    stringComplete = false;
+  }
+}
+
+void serialEvent() {
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    inputString += inChar;
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
+}
+
+
+uint32_t remap(int x, int y) {
+  int i = x % 2;
+  return (x + i) * HEIGHT - i + (i ? -y : y);
 }
 
 void initScrollBuffer() {
@@ -57,7 +93,7 @@ void nextScroll() {
   for (int y = 0; y < HEIGHT; y++) {
     char thisByte = font8x8_basic[(int)letter][y];
     if ((thisByte >> columnOffset) & 1) {
-      scrollBuffer[y][WIDTH - 1] = 0x00110000;
+      scrollBuffer[y][WIDTH - 1] = 0x00602000;
     }
   }
 
